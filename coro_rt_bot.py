@@ -86,7 +86,7 @@ def save_retweeted_ids(ids):
         json.dump(list(ids), f, ensure_ascii=False, indent=2)
 
 
-def is_streaming_tweet(status: tweepy.Status) -> bool:
+def is_streaming_tweet(status) -> bool:
     """ツイートが配信告知っぽいか判定"""
 
     # v1.1 で tweet_mode="extended" を使うと full_text が入る
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
