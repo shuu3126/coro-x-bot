@@ -1,4 +1,5 @@
 import os
+import time
 import json
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,9 @@ HASHTAGS = [
     "來凛みゅぜ配信",
 ]
 
+# タイムラインをチェックする間隔（秒）
+INTERVAL_SECONDS = 60 * 5  # 5分ごと
+
 # RTしたツイートIDを保存しておくファイル
 RETWEETED_LOG_FILE = Path("retweeted_ids.json")
 
@@ -35,7 +39,7 @@ RETWEETED_LOG_FILE = Path("retweeted_ids.json")
 
 
 def load_env():
-    """環境変数からAPIキー類を読み込む (.env or GitHub Secrets)"""
+    """ .env からAPIキー類を読み込む """
     load_dotenv()
     api_key = os.getenv("X_API_KEY")
     api_secret = os.getenv("X_API_SECRET")
@@ -43,7 +47,7 @@ def load_env():
     access_token_secret = os.getenv("X_ACCESS_TOKEN_SECRET")
 
     if not all([api_key, api_secret, access_token, access_token_secret]):
-        raise RuntimeError("APIキーまたはトークンが環境変数に正しく設定されていません。")
+        raise RuntimeError("APIキーまたはトークンが .env に正しく設定されていません。")
 
     return api_key, api_secret, access_token, access_token_secret
 
@@ -163,17 +167,23 @@ def fetch_and_rt_for_user(api: tweepy.API, screen_name: str, already_rt_ids: set
 
 
 def main():
-    print("=== CORO PROJECT 配信告知 自動RTボット（1回実行モード） ===")
+    print("=== CORO PROJECT 配信告知 自動RTボット ===")
     api = create_api_client()
     already_rt_ids = load_retweeted_ids()
     print(f"過去ログ読み込み: {len(already_rt_ids)} 件")
 
-    # GitHub Actions から呼ばれたら「一周だけ」チェックして終了
-    for user in TARGET_USERS:
-        fetch_and_rt_for_user(api, user, already_rt_ids)
+    try:
+        while True:
+            for user in TARGET_USERS:
+                fetch_and_rt_for_user(api, user, already_rt_ids)
 
-    save_retweeted_ids(already_rt_ids)
-    print("今回のチェックが完了しました。")
+            print(f"== {INTERVAL_SECONDS}秒待機 ==")
+            time.sleep(INTERVAL_SECONDS)
+
+    except KeyboardInterrupt:
+        print("手動停止しました。最新のRTログを保存します…")
+        save_retweeted_ids(already_rt_ids)
+        print("終了。")
 
 
 if __name__ == "__main__":
