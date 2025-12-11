@@ -1,5 +1,6 @@
+# coro_rt_bot.py
+
 import os
-import time
 import json
 from datetime import datetime
 from pathlib import Path
@@ -15,8 +16,10 @@ TARGET_USERS = [
 ]
 
 # 「配信っぽいツイート」を判定するキーワード
+# （どれか1つでも含まれていればOK）
 KEYWORDS = [
     "配信はじまるよ",
+    "http://twitch.tv/aomishibi",
     "twitch.tv/aomishibi",
     "twitch.tv/kurin_musee",
     "次の配信",
@@ -29,9 +32,6 @@ HASHTAGS = [
     "來凛みゅぜ配信",
 ]
 
-# タイムラインをチェックする間隔（秒）
-INTERVAL_SECONDS = 60 * 5  # 5分ごと
-
 # RTしたツイートIDを保存しておくファイル
 RETWEETED_LOG_FILE = Path("retweeted_ids.json")
 
@@ -39,7 +39,7 @@ RETWEETED_LOG_FILE = Path("retweeted_ids.json")
 
 
 def load_env():
-    """ .env からAPIキー類を読み込む """
+    """環境変数からAPIキー類を読み込む (.env or GitHub Secrets)"""
     load_dotenv()
     api_key = os.getenv("X_API_KEY")
     api_secret = os.getenv("X_API_SECRET")
@@ -47,7 +47,7 @@ def load_env():
     access_token_secret = os.getenv("X_ACCESS_TOKEN_SECRET")
 
     if not all([api_key, api_secret, access_token, access_token_secret]):
-        raise RuntimeError("APIキーまたはトークンが .env に正しく設定されていません。")
+        raise RuntimeError("APIキーまたはトークンが環境変数に正しく設定されていません。")
 
     return api_key, api_secret, access_token, access_token_secret
 
@@ -101,7 +101,7 @@ def is_streaming_tweet(status) -> bool:
     if hasattr(status, "retweeted_status"):
         return False
 
-    # ③ キーワード判定
+    # ③ キーワード判定（どれか1つでも含まれていればOK）
     for kw in KEYWORDS:
         if kw.lower() in lowered:
             return True
@@ -160,32 +160,24 @@ def fetch_and_rt_for_user(api: tweepy.API, screen_name: str, already_rt_ids: set
                 # 「既にRT済み」などでエラーになることもある
                 print(f"[ERROR] RT失敗 tweet_id={tweet_id}: {e}")
         else:
-            print(f"[SKIP] 条件に合わないツイート: {tweet_id}")
-
-    # 変更を保存
-    save_retweeted_ids(already_rt_ids)
+            # デバッグ用：どんなツイートをスキップしているか先頭だけ表示
+            text = getattr(status, "full_text", status.text or "")
+            print(f"[SKIP] 条件に合わないツイート: {tweet_id} | {text[:50]}")
 
 
 def main():
-    print("=== CORO PROJECT 配信告知 自動RTボット ===")
+    print("=== CORO PROJECT 配信告知 自動RTボット（1回実行モード） ===")
     api = create_api_client()
     already_rt_ids = load_retweeted_ids()
     print(f"過去ログ読み込み: {len(already_rt_ids)} 件")
 
-    try:
-        while True:
-            for user in TARGET_USERS:
-                fetch_and_rt_for_user(api, user, already_rt_ids)
+    # GitHub Actions から呼ばれたら「一周だけ」チェックして終了
+    for user in TARGET_USERS:
+        fetch_and_rt_for_user(api, user, already_rt_ids)
 
-            print(f"== {INTERVAL_SECONDS}秒待機 ==")
-            time.sleep(INTERVAL_SECONDS)
-
-    except KeyboardInterrupt:
-        print("手動停止しました。最新のRTログを保存します…")
-        save_retweeted_ids(already_rt_ids)
-        print("終了。")
+    save_retweeted_ids(already_rt_ids)
+    print("今回のチェックが完了しました。")
 
 
 if __name__ == "__main__":
     main()
-
