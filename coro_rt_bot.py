@@ -17,7 +17,7 @@ TARGET_USERS = [
 # 「配信っぽいツイート」を判定するキーワード
 KEYWORDS = [
     "配信はじまるよ",
-    "http://twitch.tv/aomishibi",
+    "twitch.tv/aomishibi",
     "twitch.tv/kurin_musee",
     "次の配信",
 ]
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
